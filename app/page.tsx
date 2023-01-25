@@ -5,20 +5,19 @@ import React, {
   createContext,
   useCallback,
   useContext,
-  useEffect,
   useRef,
-  useState,
+  useSyncExternalStore,
 } from "react";
 import ContentContainer from "@/components/ContentContainer";
 
-type StoreType = {
+type Store = {
   first: string;
   last: string;
 };
 
 export function useStoreData(): {
-  get(): StoreType;
-  set(value: Partial<StoreType>): void;
+  get(): Store;
+  set(value: Partial<Store>): void;
   subscribe(callback: () => void): () => void;
 } {
   const store = useRef({
@@ -30,7 +29,7 @@ export function useStoreData(): {
 
   const subscribers = useRef(new Set<() => void>());
 
-  const set = useCallback((value: Partial<StoreType>) => {
+  const set = useCallback((value: Partial<Store>) => {
     store.current = { ...store.current, ...value };
     subscribers.current.forEach((callback) => callback());
   }, []);
@@ -47,17 +46,17 @@ export function useStoreData(): {
   };
 }
 
-export function useStore(): [StoreType, (value: Partial<StoreType>) => void] {
+export function useStore<SelectorOutput>(
+  selector: (store: Store) => SelectorOutput
+): [SelectorOutput, (value: Partial<Store>) => void] {
   const store = useContext(StoreContext);
   if (!store) {
     throw new Error("Store not found");
   }
 
-  const [state, setState] = useState(store.get());
-
-  useEffect(() => {
-    return store.subscribe(() => setState(store.get()));
-  }, []);
+  const state = useSyncExternalStore(store.subscribe, () =>
+    selector(store.get())
+  );
 
   return [state, store.set];
 }
