@@ -1,91 +1,86 @@
-import Image from 'next/image'
-import { Inter } from '@next/font/google'
-import styles from './page.module.css'
+"use client";
 
-const inter = Inter({ subsets: ['latin'] })
+import "@/styles/tailwind.css";
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
+import ContentContainer from "@/components/ContentContainer";
 
-export default function Home() {
+type StoreType = {
+  first: string;
+  last: string;
+};
+
+export function useStoreData(): {
+  get(): StoreType;
+  set(value: Partial<StoreType>): void;
+  subscribe(callback: () => void): () => void;
+} {
+  const store = useRef({
+    first: "",
+    last: "",
+  });
+
+  const get = useCallback(() => store.current, []);
+
+  const subscribers = useRef(new Set<() => void>());
+
+  const set = useCallback((value: Partial<StoreType>) => {
+    store.current = { ...store.current, ...value };
+    subscribers.current.forEach((callback) => callback());
+  }, []);
+
+  const subscribe = useCallback((callback: () => void) => {
+    subscribers.current.add(callback);
+    return () => subscribers.current.delete(callback);
+  }, []);
+
+  return {
+    get,
+    set,
+    subscribe,
+  };
+}
+
+export function useStore(): [StoreType, (value: Partial<StoreType>) => void] {
+  const store = useContext(StoreContext);
+  if (!store) {
+    throw new Error("Store not found");
+  }
+
+  const [state, setState] = useState(store.get());
+
+  useEffect(() => {
+    return store.subscribe(() => setState(store.get()));
+  }, []);
+
+  return [state, store.set];
+}
+
+type useStoreDataReturnType = ReturnType<typeof useStoreData>;
+
+export const StoreContext = createContext<useStoreDataReturnType>(
+  {} as unknown as useStoreDataReturnType
+);
+
+const StoreContextProvider = ({ children }: { children: React.ReactNode }) => (
+  <StoreContext.Provider value={useStoreData()}>
+    {children}
+  </StoreContext.Provider>
+);
+
+export default function HomePage() {
   return (
-    <main className={styles.main}>
-      <div className={styles.description}>
-        <p>
-          Get started by editing&nbsp;
-          <code className={styles.code}>app/page.tsx</code>
-        </p>
-        <div>
-          <a
-            href="https://vercel.com?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            By{' '}
-            <Image
-              src="/vercel.svg"
-              alt="Vercel Logo"
-              className={styles.vercelLogo}
-              width={100}
-              height={24}
-              priority
-            />
-          </a>
-        </div>
+    <StoreContextProvider>
+      <div className="max-w-xl mx-auto py-20 px-9 border mt-12">
+        <h1 className="font-bold text-4xl mb-7">App</h1>
+        <ContentContainer />
       </div>
-
-      <div className={styles.center}>
-        <Image
-          className={styles.logo}
-          src="/next.svg"
-          alt="Next.js Logo"
-          width={180}
-          height={37}
-          priority
-        />
-        <div className={styles.thirteen}>
-          <Image src="/thirteen.svg" alt="13" width={40} height={31} priority />
-        </div>
-      </div>
-
-      <div className={styles.grid}>
-        <a
-          href="https://beta.nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className={styles.card}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={inter.className}>
-            Docs <span>-&gt;</span>
-          </h2>
-          <p className={inter.className}>
-            Find in-depth information about Next.js features and API.
-          </p>
-        </a>
-
-        <a
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className={styles.card}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={inter.className}>
-            Templates <span>-&gt;</span>
-          </h2>
-          <p className={inter.className}>Explore the Next.js 13 playground.</p>
-        </a>
-
-        <a
-          href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className={styles.card}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={inter.className}>
-            Deploy <span>-&gt;</span>
-          </h2>
-          <p className={inter.className}>
-            Instantly deploy your Next.js site to a shareable URL with Vercel.
-          </p>
-        </a>
-      </div>
-    </main>
-  )
+    </StoreContextProvider>
+  );
 }
